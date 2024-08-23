@@ -159,6 +159,7 @@ module K8s
         ssl_verify_peer: options.key?(:ssl_verify_peer) ? options.delete(:ssl_verify_peer) : true,
         ssl_ca_file: options.delete(:ssl_ca_file) || File.join((ENV['TELEPRESENCE_ROOT'] || '/'), 'var/run/secrets/kubernetes.io/serviceaccount/ca.crt'),
         auth_token: options.delete(:auth_token) || File.read(File.join((ENV['TELEPRESENCE_ROOT'] || '/'), 'var/run/secrets/kubernetes.io/serviceaccount/token')),
+        is_in_cluster: true,
         **options
       )
     end
@@ -170,7 +171,7 @@ module K8s
     # @param auth_username [String] optional Basic authentication username
     # @param auth_password [String] optional Basic authentication password
     # @param options [Hash] @see Excon.new
-    def initialize(server, config, auth_token: nil, auth_token_expiration: nil, auth_username: nil, auth_password: nil, **options)
+    def initialize(server, config=nil, auth_token: nil, auth_token_expiration: nil, auth_username: nil, auth_password: nil, is_in_cluster: nil, **options)
       uri = URI.parse(server)
       @server = "#{uri.scheme}://#{uri.host}:#{uri.port}"
       @config = config
@@ -178,6 +179,7 @@ module K8s
       @auth_token = auth_token
       @auth_token_expiration = auth_token_expiration
       @auth_username = auth_username
+      @is_in_cluster = is_in_cluster
       @auth_password = auth_password
       @options = options
 
@@ -215,7 +217,7 @@ module K8s
       options[:headers] ||= {}
 
       # Check if the token has expired, regenerate it if required
-      token_expired = DateTime.now > @auth_token_expiration
+      token_expired = !@is_in_cluster && DateTime.now > @auth_token_expiration
       if @auth_token && token_expired
         @auth_token, @auth_token_expiration = self.class.token_from_exec(@config)
       end
